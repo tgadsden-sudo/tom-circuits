@@ -1,5 +1,5 @@
 import { DemoPlayback } from '../audio/demoPlayback';
-import { LiveInputController, type LiveConnection, type LiveDevice, type LiveStatus } from '../audio/liveInput';
+import { LiveInputController, type ConnectOptions, type LiveConnection, type LiveDevice, type LiveStatus } from '../audio/liveInput';
 import { FrequencyStabilizer } from '../signal/analysis';
 import { DEFAULT_DEMO_PARAMS, DemoGenerator, describeDemo } from '../signal/generator';
 import { RingBuffer } from '../signal/ring';
@@ -53,7 +53,8 @@ export interface EngineState {
   demo: DemoParams;
   playback: { running: boolean; volume: number };
   live: { status: LiveStatus; detail: string; devices: LiveDevice[]; deviceId: string; connection: LiveConnection | null };
-  contextState: AudioContextState | 'none';
+  /** AudioContext state; iOS Safari also reports the non-standard 'interrupted'. */
+  contextState: string;
   frozen: Capture | null;
   reference: Capture | null;
   /** Bumps whenever any of the above changes. */
@@ -107,6 +108,8 @@ export class ScopeEngine {
   private displayLen = 0;
   private displayTrigger = -1;
   private displayOffsetFromEnd = 0;
+  /** ring.totalWritten at the moment the display window was computed, so a later freeze can correct for samples pushed since. */
+  private displayTotal = 0;
   private lastTriggerTime = 0;
   private lastInputClipping = false;
 
@@ -242,6 +245,7 @@ export class ScopeEngine {
       this.ring = new RingBuffer(Math.min(MAX_SAMPLE_RATE, Math.round(sr)) * HISTORY_SECONDS);
       this.displayLen = 0;
       this.displayTrigger = -1;
+      this.displayTotal = 0;
       this.stabilizer.reset();
       this.patch({ sampleRate: sr });
     } else {
@@ -279,17 +283,18 @@ export class ScopeEngine {
     this.patch({
       source: kind,
       playback: { running: false, volume: this.playback.volume },
-      sourceLabel: wasLive && this.state.live.connection ? this.state.live.connection.deviceLabel : kind === 'microphone' ? 'Microphone (not connected)' : 'External input (not connected)',
+      sourceLabel: wasLive && this.state.live.connection ? this.state.live.connection.deviceLabel : notConnectedLabel(kind),
     });
   }
 
-  async connectLive(deviceId?: string): Promise<void> {
+  async connectLive(opts: ConnectOptions | string = {}): Promise<void> {
     if (this.state.source === 'demo') return;
+    const options: ConnectOptions = typeof opts === 'string' ? { deviceId: opts } : opts;
     if (this.playback.running) this.playback.stop();
     this.stopDemoFeed();
     this.patch({ playback: { running: false, volume: this.playback.volume } });
     try {
-      const conn = await this.live.connect(deviceId);
+      const conn = await this.live.connect(options);
       if (!conn || this.disposed) return;
       this.setSampleRate(conn.sampleRate);
       this.patch({
@@ -302,6 +307,12 @@ export class ScopeEngine {
     }
   }
 
+  /** Rescan inputs and reconnect, preferring a likely external adapter (used after plugging in late). */
+  async reconnectLive(deviceId?: string): Promise<void> {
+    if (this.state.source === 'demo') return;
+    await this.connectLive({ deviceId, preferExternal: !deviceId });
+  }
+
   cancelConnect(): void {
     this.live.cancel();
   }
@@ -310,7 +321,7 @@ export class ScopeEngine {
     this.live.disconnect(true);
     this.patch({
       live: { ...this.state.live, connection: null },
-      sourceLabel: this.state.source === 'microphone' ? 'Microphone (not connected)' : 'External input (not connected)',
+      sourceLabel: notConnectedLabel(this.state.source),
     });
   }
 
@@ -328,10 +339,11 @@ export class ScopeEngine {
   }
 
   private onLiveStatus(status: LiveStatus, detail: string): void {
-    const connected = status === 'connected';
+    const keepsConnection = status === 'connected' || status === 'muted';
+    const label = status === 'connected' && detail ? detail : this.state.live.connection?.deviceLabel ?? '';
     this.patch({
-      live: { ...this.state.live, status, detail, connection: connected ? this.state.live.connection : null },
-      sourceLabel: connected ? detail : this.state.source === 'demo' ? this.state.sourceLabel : this.state.source === 'microphone' ? 'Microphone (not connected)' : 'External input (not connected)',
+      live: { ...this.state.live, status, detail, connection: keepsConnection ? this.state.live.connection : null },
+      sourceLabel: keepsConnection ? label || this.state.sourceLabel : this.state.source === 'demo' ? this.state.sourceLabel : notConnectedLabel(this.state.source),
     });
   }
 
@@ -339,7 +351,7 @@ export class ScopeEngine {
     if (this.state.source !== 'demo' && this.state.live.status === 'connected') this.ring.push(block);
   }
 
-  private setContextState(s: AudioContextState): void {
+  private setContextState(s: string): void {
     if (s !== this.state.contextState) this.patch({ contextState: s });
   }
 
@@ -421,7 +433,13 @@ export class ScopeEngine {
     } else {
       notes.push('Live audio input. Values are normalized digital amplitude after the device\'s analogue front end and any browser/OS processing; not calibrated to volts.');
       if (this.state.source === 'microphone') notes.push('Acoustic capture: the microphone, air and room have altered the original signal.');
-      for (const n of this.state.live.connection?.processingNotes ?? []) notes.push(n);
+      const c = this.state.live.connection;
+      if (c) {
+        notes.push(`input identity: ${c.identity.identity} (${c.identity.reason})`);
+        if (c.captureSampleRate && c.captureSampleRate !== c.sampleRate) notes.push(`capture sample rate reported by track: ${c.captureSampleRate} Hz; resampled by the browser to the ${c.sampleRate} Hz processing rate used here.`);
+        if (c.sampleSize) notes.push(`sample size reported by track: ${c.sampleSize} bit (samples are delivered to the app as 32-bit float).`);
+        for (const n of c.processingNotes) notes.push(n);
+      }
     }
     return {
       source: this.state.source,
@@ -435,8 +453,10 @@ export class ScopeEngine {
   private makeCapture(): Capture {
     const samples = this.ring.snapshot();
     const len = Math.min(this.displayLen || this.windowLength(), samples.length);
-    let start = samples.length - this.displayOffsetFromEnd;
-    if (this.displayLen === 0) start = samples.length - len;
+    // Samples pushed since the display window was computed shift it further from the end.
+    const drift = Math.max(0, this.ring.totalWritten - this.displayTotal);
+    let start = samples.length - (this.displayOffsetFromEnd + drift);
+    if (this.displayLen === 0 || start < 0) start = samples.length - len;
     start = Math.max(0, Math.min(start, samples.length - len));
     const trig = this.displayTrigger >= 0 ? start + this.displayTrigger : -1;
     return { samples, sampleRate: this.state.sampleRate, windowStart: start, windowLength: len, triggerIndex: trig, meta: this.meta() };
@@ -464,6 +484,7 @@ export class ScopeEngine {
         this.displayLen = winLen;
         this.displayTrigger = -1;
         this.displayOffsetFromEnd = winLen;
+        this.displayTotal = this.ring.totalWritten;
         if (s.triggerState !== 'free-running' && s.runMode === 'run') this.setTriggerState('free-running');
         if (s.runMode === 'single' && !filling) {
           this.patch({ runMode: 'frozen', frozen: this.makeCapture(), triggerState: 'frozen' });
@@ -483,6 +504,7 @@ export class ScopeEngine {
           this.displayLen = winLen;
           this.displayTrigger = pre;
           this.displayOffsetFromEnd = searchLen - start;
+          this.displayTotal = this.ring.totalWritten;
           this.lastTriggerTime = now;
           if (s.runMode === 'single') {
             this.patch({ runMode: 'frozen', frozen: this.makeCapture(), triggerState: 'frozen' });
@@ -497,6 +519,7 @@ export class ScopeEngine {
             this.displayLen = winLen;
             this.displayTrigger = -1;
             this.displayOffsetFromEnd = winLen;
+            this.displayTotal = this.ring.totalWritten;
           }
           if (s.triggerState !== want) this.setTriggerState(want);
         }
@@ -582,6 +605,10 @@ export class ScopeEngine {
     this.stateListeners.clear();
     this.analysisListeners.clear();
   }
+}
+
+export function notConnectedLabel(kind: SourceKind): string {
+  return kind === 'microphone' ? 'Microphone (not connected)' : 'USB audio input (not connected)';
 }
 
 function nearest(options: readonly number[], value: number, floor: boolean): number {

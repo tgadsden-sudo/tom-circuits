@@ -14,8 +14,8 @@ test.describe('Wave Lab desktop (demo mode, no permissions)', () => {
     expect(rms).toBeCloseTo(0.6 / Math.SQRT2, 2);
     const p2p = parseFloat(await readMeasurement(page, 'Peak-to-peak'));
     expect(Math.abs(p2p - 1.2)).toBeLessThan(0.02);
-    await expect(page.locator('dt:has-text("Sample rate") + dd')).toContainText('48000 Hz');
-    await expect(page.locator('dt:has-text("Input clipping") + dd').first()).toHaveText('no');
+    await expect(page.locator('.measurements dt:has-text("Sample rate") + dd')).toContainText('48000 Hz');
+    await expect(page.locator('.measurements dt:has-text("Input clipping") + dd').first()).toHaveText('no');
     await expect(page.locator('.trig-state')).toContainText('Triggered');
     // canvas actually has trace pixels (not blank)
     const painted = await page.locator('.scope-canvas').evaluate((c: HTMLCanvasElement) => {
@@ -47,19 +47,19 @@ test.describe('Wave Lab desktop (demo mode, no permissions)', () => {
     await page.waitForTimeout(400);
     const rms2 = parseFloat(await readMeasurement(page, 'RMS amplitude'));
     expect(Math.abs(rms2 - rms)).toBeLessThan(0.01);
-    await expect(page.locator('dt:has-text("Input clipping") + dd').first()).toHaveText('no');
+    await expect(page.locator('.measurements dt:has-text("Input clipping") + dd').first()).toHaveText('no');
     await expect(page.locator('.plot-info')).toContainText('gain ×10');
     // Noise: no confident pitch
     await page.getByLabel('Waveform').selectOption('noise');
-    await expect.poll(async () => (await page.locator('dt:has-text("Frequency") + dd').innerText()).trim(), { timeout: 8000 }).toBe('—');
-    await expect(page.locator('dt:has-text("Frequency") + dd + dd')).toContainText('no clear repeating pattern');
+    await expect.poll(async () => (await page.locator('.measurements dt:has-text("Frequency") + dd').innerText()).trim(), { timeout: 8000 }).toBe('—');
+    await expect(page.locator('.measurements dt:has-text("Frequency") + dd + dd')).toContainText('no clear repeating pattern');
     // Siren: unstable rather than a fake stable number
     await page.getByLabel('Waveform').selectOption('siren');
-    await expect.poll(async () => (await page.locator('dt:has-text("Frequency") + dd').innerText()).trim(), { timeout: 8000 }).toBe('unstable');
+    await expect.poll(async () => (await page.locator('.measurements dt:has-text("Frequency") + dd').innerText()).trim(), { timeout: 8000 }).toBe('unstable');
     // Amplitude 0 → silence
     await page.getByLabel('Waveform').selectOption('sine');
     await page.getByLabel(/^Amplitude/).fill('0');
-    await expect(page.locator('dt:has-text("Frequency") + dd + dd')).toContainText('insufficient signal', { timeout: 8000 });
+    await expect(page.locator('.measurements dt:has-text("Frequency") + dd + dd')).toContainText('insufficient signal', { timeout: 8000 });
     expect(errors).toEqual([]);
   });
 
@@ -111,8 +111,10 @@ test.describe('Wave Lab desktop (demo mode, no permissions)', () => {
     // trigger index = pre-trigger = 10% of window
     expect(meta['trigger_sample_index']).toBe('96');
     // and the sample at the trigger is a rising zero crossing
-    expect(rows[95][1]).toBeLessThan(0);
+    // (CSV rounds to 6 decimals, so a sample just below zero can read as -0.000000)
+    expect(rows[95][1]).toBeLessThanOrEqual(0);
     expect(rows[96][1]).toBeGreaterThanOrEqual(0);
+    expect(rows[97][1]).toBeGreaterThan(0.01);
 
     // Zooming while frozen keeps frozen data and changes the export length
     await page.getByLabel('Time / division').selectOption('0.001');
@@ -161,6 +163,10 @@ test.describe('Wave Lab desktop (demo mode, no permissions)', () => {
     await page.getByRole('button', { name: 'Connect microphone' }).click();
     await expect(page.locator('#live-status')).toContainText('No audio input device was found', { timeout: 10000 });
     await expect(page.locator('.source-badge')).toContainText('not connected');
+    await page.getByRole('tab', { name: 'USB audio / Sabrent' }).click();
+    await page.getByRole('button', { name: 'Connect USB input' }).click();
+    await expect(page.locator('#live-status')).toContainText('Connect the adapter first', { timeout: 10000 });
+    await expect(page.getByRole('button', { name: /Reconnect \/ rescan/ })).toBeVisible();
   });
 
   test('microphone permission denied leaves an honest, usable UI', async ({ page, context }) => {

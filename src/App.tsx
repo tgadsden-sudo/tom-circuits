@@ -128,7 +128,7 @@ export default function App() {
         </div>
 
         <aside className="controls">
-          <SourcePanel engine={engine} state={state} tab={tab} onTab={onTab} />
+          <SourcePanel engine={engine} state={state} measurements={m} tab={tab} onTab={onTab} />
           <ScopeControls engine={engine} state={state} />
           <MeasurementsPanel state={state} m={m} spectrum={analysis.spectrum} />
           <ExportPanel engine={engine} state={state} />

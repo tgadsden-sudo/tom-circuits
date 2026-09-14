@@ -11,14 +11,14 @@ export function collectConsoleErrors(page: Page): string[] {
 
 /** Read the numeric frequency shown in the Measurements panel (Hz), or NaN. */
 export async function readFrequencyHz(page: Page): Promise<number> {
-  const text = await page.locator('dt:has-text("Frequency") + dd').innerText();
+  const text = await page.locator('.measurements dt:has-text("Frequency") + dd').innerText();
   const m = text.match(/([\d.]+)\s*(k?)Hz/);
   if (!m) return NaN;
   return parseFloat(m[1]) * (m[2] === 'k' ? 1000 : 1);
 }
 
 export async function readMeasurement(page: Page, label: string): Promise<string> {
-  return page.locator(`dt:has-text("${label}") + dd`).innerText();
+  return page.locator(`.measurements dt:has-text("${label}") + dd`).innerText();
 }
 
 export async function waitForFrequency(page: Page, target: number, tolerance = 0.01): Promise<number> {

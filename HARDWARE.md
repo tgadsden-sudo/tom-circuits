@@ -13,7 +13,7 @@ explains which set-ups are supported, which are conditional, and which are out o
 | --- | --- | --- |
 | Demo mode | ✓ Supported | None |
 | Acoustic experiments | ✓ Supported | Device microphone + the kit's speaker |
-| Direct electrical audio capture | △ Conditional | A verified, protected/attenuated audio interface, proper leads, a real audio input |
+| Direct electrical audio capture via the **Sabrent AU-UCMA** | △ Conditional | The adapter (pink/purple mic socket), a lead, suitable input conditioning, iPhone + Safari |
 | DC, calibrated voltage, non-audio bandwidth | ✕ Not supported | A real oscilloscope or DAQ with probes |
 
 ## 1. Demo mode — no extra equipment
@@ -43,11 +43,50 @@ Limits to be aware of:
   may still process the audio. Loudness comparisons are therefore approximate.
 * Amplitude readings are normalized digital values, not sound-pressure levels.
 
-## 3. Direct electrical audio capture — conditional
+## 3. Direct electrical audio capture — Sabrent AU-UCMA (conditional)
 
-Wave Lab can display whatever an audio-input device delivers to the browser (through
-`getUserMedia`). Feeding a circuit signal into such an input is only acceptable when **all** of the
-following are in place:
+The purchased interface is the **Sabrent AU-UCMA** USB-C audio adapter. From the manufacturer and
+retailer descriptions that could be read (search snippets only; the product page itself was not
+reachable from the build environment): a USB-C plug-and-play, bus-powered adapter with a **separate
+pink/purple 3.5 mm microphone input (mono)** and a **separate green 3.5 mm headphone output
+(stereo)**, advertised at 16/24-bit up to 96 kHz. **No input sensitivity, maximum input level or
+voltage rating was found** in that material, so none is assumed here.
+
+Intended signal path:
+
+```
+BrainBox measurement points
+  → appropriate input conditioning where required
+  → existing crocodile-clip (red/black) to 3.5 mm TRS lead   [internal wiring NOT verified]
+  → Sabrent pink/purple MICROPHONE socket                    [never the green headphone socket]
+  → USB-C iPhone
+  → Wave Lab in Safari (HTTPS)
+```
+
+**Use the kit's verified oscilloscope wiring and suitable input conditioning. This microphone input
+is not a general-purpose voltage probe.**
+
+Points that remain open:
+
+* **Input conditioning.** The adapter's microphone input is designed for microphone-level signals.
+  What attenuation, coupling or protection is needed between the BrainBox and the lead is
+  unverified; this document does not propose component values.
+* **The lead.** The existing lead has red/black crocodile clips and a three-contact TRS plug. Its
+  internal wiring (which clip goes to tip, ring or sleeve) has not been verified. Because the Sabrent
+  has a dedicated microphone socket, a smartphone TRRS splitter or a RØDE SC4-type adapter is *not*
+  automatically required; whether the TRS lead is wired appropriately for a mono microphone input is
+  still to be checked.
+* **Supply voltage is not a signal rating.** The kit typically runs from two AA cells, about 3 V
+  nominal. That is the circuit supply, not a verified signal amplitude and not an adapter input
+  rating.
+* **Bit depth and sample rate.** The advertised 24-bit/96 kHz is what the adapter can do, not what
+  Safari will negotiate. Wave Lab shows the sample rate and sample size the browser actually reports,
+  and analyses at the AudioContext rate.
+* **Hardware compatibility of the Sabrent + iPhone + Safari combination has not been tested** by the
+  author; iOS may expose the adapter only as an unlabelled default input, which Wave Lab reports as
+  "System-selected input — external adapter not confirmed".
+
+General conditions that still apply to any interface:
 
 * A **verified, suitable, protected and attenuated interface** designed for connecting external
   signals to an audio input (input protection, attenuation and AC coupling appropriate for the
@@ -67,7 +106,9 @@ Things that are *not* sufficient:
   circuit can exceed that or present DC.
 
 Wave Lab deliberately does **not** give resistor values, probe wiring or instructions for connecting
-unknown outputs. The **exact BrainBox connection requirements remain unverified**: no manufacturer
+unknown outputs. Software gain cannot protect the physical input or undo clipping that occurred
+before digitisation; the app's clipping indicator is advisory, since analogue overload can occur
+without samples reaching digital full scale. The **exact BrainBox connection requirements remain unverified**: no manufacturer
 documentation describing the original programme's cable, input or protection circuitry was found
 (see [RESEARCH.md](RESEARCH.md)). If you locate the original manual or instructions, follow those,
 and treat everything in this section as general engineering guidance rather than verified

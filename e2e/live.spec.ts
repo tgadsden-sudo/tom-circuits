@@ -26,7 +26,7 @@ test.describe('live input with simulated (fake) microphone', () => {
     // Live tracks are active
     const tracks = await page.evaluate(() => (window as unknown as { __tracks?: number }).__tracks ?? -1);
     expect(tracks).toBe(-1); // no global leakage
-    await expect(page.getByText('Capture details')).toBeVisible();
+    await expect(page.locator('#diagnostics summary')).toHaveText('Diagnostics');
 
     await page.getByRole('button', { name: 'Disconnect input' }).click();
     await expect(page.locator('#live-status')).toContainText('Input released');
@@ -39,21 +39,21 @@ test.describe('live input with simulated (fake) microphone', () => {
     await page.getByRole('tab', { name: 'Demo signals' }).click();
     await expect(page.locator('.source-badge')).toContainText('SIMULATED');
     await waitForFrequency(page, 440, 0.01);
-    await expect(page.locator('dt:has-text("Sample rate") + dd')).toContainText('48000 Hz');
+    await expect(page.locator('.measurements dt:has-text("Sample rate") + dd')).toContainText('48000 Hz');
     expect(errors).toEqual([]);
   });
 
   test('cancelling a pending connection never reports a connection', async ({ page }) => {
     await page.goto('/');
-    await page.getByRole('tab', { name: 'External input' }).click();
-    await expect(page.locator('.source-badge')).toContainText('EXTERNAL INPUT');
-    await expect(page.getByText(/Only connect circuit terminals/)).toBeVisible();
+    await page.getByRole('tab', { name: 'USB audio / Sabrent' }).click();
+    await expect(page.locator('.source-badge')).toContainText('USB AUDIO');
+    await expect(page.locator('#tabpanel-external').getByText('This microphone input is not a general-purpose voltage probe.')).toBeVisible();
     // Slow down getUserMedia so we can cancel while it is pending
     await page.evaluate(() => {
       const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
       navigator.mediaDevices.getUserMedia = (c) => new Promise((res, rej) => setTimeout(() => orig(c).then(res, rej), 1500));
     });
-    await page.getByRole('button', { name: 'Connect input' }).click();
+    await page.getByRole('button', { name: 'Connect USB input' }).click();
     await expect(page.locator('#live-status')).toContainText('Requesting');
     await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.locator('#live-status')).toContainText('cancelled');

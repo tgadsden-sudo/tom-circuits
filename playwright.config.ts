@@ -32,7 +32,7 @@ export default defineConfig({
     },
     {
       name: 'fake-mic',
-      testMatch: /live\.spec\.ts/,
+      testMatch: /(live|usb)\.spec\.ts/,
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1400, height: 900 },

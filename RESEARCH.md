@@ -55,3 +55,27 @@ manufacturer's documents.
 
 If the original manual or CD documentation becomes available, its instructions should be cited in
 HARDWARE.md and distinguished from the general guidance there.
+
+## Addendum: Sabrent AU-UCMA USB-C audio adapter (searched 2026-09-14)
+
+The manufacturer page <https://sabrent.com/products/au-ucma>, a hosted copy of its manual
+(manuals.plus), a B&H listing and a forum practical test were all **blocked by the environment's
+egress proxy**; only search snippets could be read.
+
+Found via snippets (not independently verified):
+
+* Two separate 3.5 mm jacks: one stereo headphone/line output and one **mono microphone input**;
+  integrated USB-C cable; aluminium body; bus-powered; plug-and-play. Input and output described as
+  16/24-bit up to 96 kHz.
+  <https://www.amazon.com/SABRENT-Adapter-Headphone-Upgrade-AU-UCMA/dp/B0DGMVFY85>,
+  <https://www.bhphotovideo.com/c/product/1926518-REG/sabrent_au_ucma_usb_c_to_dual.html>,
+  <https://www.microcenter.com/product/690288/sabrent-usb-type-c-audio-adapter>
+* A forum "practical test" reports use with iOS devices and 24-bit resolution being achievable, but
+  its details could not be read:
+  <https://forum.loopypro.com/discussion/64790/8-49-24-bit-96-khz-3-67-ms-sabrent-au-ucma-practical-test>
+* A user manual exists but could not be opened:
+  <https://manuals.plus/m/256309569049f3ee51b7a25e668b1b2455ab2256c82925b1862984bf1bd6c339>
+
+Not found: any microphone-input sensitivity, maximum input level or voltage rating, plug-in-power
+(bias) details, or TRS/TRRS wiring of the microphone socket. Wave Lab therefore states no input
+limit and treats the required input conditioning as an open question.

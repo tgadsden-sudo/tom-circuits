@@ -12,7 +12,7 @@ Three input modes, always visibly labelled in the header badge:
 | --- | --- | --- |
 | **Demo signals** | Simulated sine, square, triangle, sawtooth, white noise and siren, generated as real sample buffers | Nothing; works offline once loaded |
 | **Microphone** | Sound captured through the air (speech, humming, whistles, the kit's speaker) | A microphone, HTTPS or localhost, permission |
-| **External audio input** | Any audio-input device the browser exposes (for example a USB audio interface) | A *verified, protected* interface before any circuit is connected; see [HARDWARE.md](HARDWARE.md) |
+| **USB audio / Sabrent** | An audio-input device the browser exposes; primary target is the **Sabrent AU-UCMA** USB-C adapter (pink/purple microphone socket) | The adapter, a lead, and suitable input conditioning before any circuit is connected; see [HARDWARE.md](HARDWARE.md) |
 
 Live input is never silently replaced by simulated data. If a connection fails, the app says so and
 shows nothing.
@@ -46,6 +46,48 @@ The end-to-end suite starts `vite preview` itself. It includes a project that la
 with a **fake microphone device** to exercise the live-capture path; that is simulated input, not a
 real microphone. If Playwright's own browser download is unavailable, point it at an installed
 Chromium with `PW_CHROMIUM_PATH=/path/to/chrome npm run test:e2e`.
+
+## USB audio / Sabrent mode
+
+The purchased adapter is the **Sabrent AU-UCMA** (USB-C; separate pink/purple 3.5 mm *microphone
+input* and green 3.5 mm *headphone output*; advertised 16/24-bit up to 96 kHz, mono microphone
+input). Wave Lab treats it as a normal audio input exposed by the operating system: capture uses
+`getUserMedia`, processing uses Web Audio/AudioWorklet, and no WebUSB or driver is involved.
+
+Connection flow (also shown in the app):
+
+1. Plug the adapter into the phone **before** starting capture. Use the **pink/purple microphone
+   socket**; the green socket is an output and is never presented as an input.
+2. Open Wave Lab directly in Safari over HTTPS (not inside another app's web view).
+3. Choose *USB audio / Sabrent*, tap **Connect USB input** and allow microphone access.
+4. If the browser lists more than one input, pick the USB adapter. After permission, Wave Lab
+   enumerates inputs, lets you select one by `deviceId`, and automatically prefers a device whose
+   label looks like a USB/external adapter. Recognition is by label heuristics, not an exact product
+   string.
+5. If the adapter was attached after capture started, use **Reconnect / rescan**.
+
+What the app will and will not claim:
+
+* If the browser exposes only an unlabelled default input (common on iOS), capture proceeds but the
+  source is labelled **"System-selected input — external adapter not confirmed"**. The app never
+  says the Sabrent is connected just because that tab is selected.
+* A label such as "USB Audio Device" is reported as *recognised by label*; the exact model is still
+  not confirmed by the browser.
+* Mono capture and disabled echo cancellation, noise suppression and automatic gain are *requested*;
+  the **Diagnostics** panel shows what the browser reports it applied. Unsupported settings never
+  block capture.
+* The diagnostics show the track's capture sample rate and the AudioContext processing rate
+  separately; analysis always uses the processing rate. Bit depth is shown only if the browser
+  exposes it; the advertised 24-bit is not assumed.
+* Unplugging, muted tracks, ended tracks and interrupted audio sessions pause or stop acquisition
+  with a visible status. Demo data is never substituted.
+* Microphone audio is never monitored through the speakers, and audible demo playback stops when
+  you enter a live mode.
+
+The input-level meter and clipping flag are advisory: analogue overload in the adapter or lead can
+happen before digitisation without samples reaching digital full scale, and software gain cannot
+undo it. The path is AC-coupled audio: it shows changing audio-frequency signals, not steady DC or
+absolute circuit voltage.
 
 ## Browser requirements
 
@@ -116,7 +158,7 @@ labelled `source: demo`.
 
 ```
 src/signal/    pure DSP, no DOM: types, generator, ring buffer, trigger, FFT, analysis, envelope, CSV
-src/audio/     Web Audio: shared AudioContext, capture + demo AudioWorklet processors, live input, playback
+src/audio/     Web Audio: shared AudioContext, capture + demo AudioWorklet processors, live input, device heuristics, playback
 src/engine/    ScopeEngine (acquisition state, freeze/single, display windows), analysis worker/client
 src/ui/        React components, canvas renderers, PNG export, hooks
 src/content/   guided experiments and hardware guide text
