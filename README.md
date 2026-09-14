@@ -35,6 +35,26 @@ The build is fully static (`dist/`); host it on any static web server. Relative 
 used, so it works from a sub-directory. Microphone access requires the page to be served over
 **HTTPS or from localhost**.
 
+## Hosting it at its own address (needed for the microphone on iPhone)
+
+Safari and Chrome only allow the microphone in a page that is **not embedded** in another page
+unless the host explicitly permits it. Preview and artifact viewers embed Wave Lab in an iframe, so
+inside them *Connect microphone* fails with a "denied" message and no prompt. Demo mode still works.
+
+The repository includes a GitHub Pages workflow (`.github/workflows/deploy-pages.yml`):
+
+1. In the GitHub repository open **Settings → Pages** and set *Build and deployment → Source* to
+   **GitHub Actions**.
+2. Merge this branch into `main` (or run the *Deploy to GitHub Pages* workflow manually from the
+   Actions tab).
+3. Open the published address, `https://<owner>.github.io/<repository>/`, directly in Safari.
+4. Choose *Microphone* or *USB audio / Sabrent*, tap **Connect** and allow the microphone. If Safari
+   still refuses: tap **aA** in the address bar → *Website Settings* → *Microphone* → **Allow**, and
+   check that *Settings → Safari → Microphone* is not set to *Deny*.
+
+Any other static HTTPS host (Netlify, Cloudflare Pages, a home server with a certificate) works the
+same way; the build in `dist/` uses relative paths.
+
 ## Tests
 
 ```bash

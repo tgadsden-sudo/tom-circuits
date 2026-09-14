@@ -147,7 +147,7 @@ function LiveControls({ engine, state, kind, measurements }: { engine: ScopeEngi
       {support.getUserMedia && !support.secureContext && <p className="status status-error">Microphone access requires HTTPS or localhost. This page is not in a secure context.</p>}
       {support.getUserMedia && !support.audioWorklet && <p className="status status-error">This browser lacks AudioWorklet, which Wave Lab needs for live capture.</p>}
       {policyBlocked && <p className="status status-error">The page that embeds Wave Lab does not allow microphone access. Open Wave Lab in its own browser tab.</p>}
-      {!policyBlocked && support.embedded && <p className="hint">Wave Lab appears to be inside an embedded preview. If the permission prompt never appears, open the app in its own browser tab.</p>}
+      {!policyBlocked && support.embedded && <p className="status status-warn">Wave Lab is running inside another page (an embedded preview or artifact viewer). Browsers usually refuse the microphone here without showing a prompt. Open Wave Lab at its own web address to use live input; demo mode works everywhere.</p>}
 
       {live.devices.length > 0 && (
         <div className="field">

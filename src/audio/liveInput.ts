@@ -329,10 +329,21 @@ export class LiveInputController {
   }
 }
 
+function isEmbedded(): boolean {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
 function describeDenied(e: DOMException): string {
   const msg = (e?.message || '').toLowerCase();
   if (msg.includes('permissions policy') || msg.includes('permission policy') || msg.includes('feature policy')) {
-    return 'Microphone access is blocked by the embedding page. Open Wave Lab in its own browser tab.';
+    return 'Microphone access is blocked by the embedding page. Open Wave Lab at its own web address in a browser tab.';
   }
-  return 'Microphone permission was denied. Allow microphone access for this site in the browser address bar (on iOS: Settings → Safari → Microphone), then try again.';
+  if (isEmbedded()) {
+    return 'Microphone permission was denied without a prompt because Wave Lab is embedded inside another page (for example a preview or artifact viewer). Browsers only allow the microphone in an embedded page if the host page permits it, and this one does not. Open Wave Lab at its own web address (see the README for GitHub Pages hosting) and try again.';
+  }
+  return 'Microphone permission was denied. Allow the microphone for this site (iOS Safari: tap "aA" in the address bar → Website Settings → Microphone → Allow, and check Settings → Safari → Microphone is not "Deny"), then try again.';
 }
